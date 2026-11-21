@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SIS 3 base - ECR repository for the API image and S3 bucket for Lambda code
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedPattern: "^[a-z0-9-]{2,12}$"
+    Description: Environment name (dev, prod, defence, ...)
+
+Resources:
+  # Склад для Docker-образа: теги нельзя перезаписать, старые образы удаляются сами
+  ApiRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EmptyOnDelete: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep only the 10 most recent images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+
+  # Хранилище для архива с кодом Lambda: зашифровано, закрыто от интернета
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 7
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+
+Outputs:
+  RepoUri:
+    Value: !GetAtt ApiRepo.RepositoryUri
+  ArtifactsBucketName:
+    Value: !Ref ArtifactsBucket
