@@ -41,10 +41,10 @@ if aws ecr describe-images --repository-name "${REPO#*/}" --image-ids imageTag="
 else
   aws ecr get-login-password | docker login --username AWS --password-stdin "${REPO%%/*}"
   docker build --platform linux/arm64 -t "$IMAGE" ./app
-  for attempt in 1 2 3; do
+  for attempt in 1 2 3 4 5 6 7 8; do
     if docker push "$IMAGE"; then break; fi
     echo "    push failed (attempt $attempt), retrying..."
-    sleep 5
+    sleep 10
   done
   aws ecr describe-images --repository-name "${REPO#*/}" --image-ids imageTag="$TAG" >/dev/null
 fi
